@@ -23,13 +23,9 @@ import {
   Layers,
 } from "lucide-react";
 
-interface OnboardingFlowProps {
-  userId: string;
-}
-
 const TOTAL_STEPS = 4;
 
-export function OnboardingFlow({ userId }: OnboardingFlowProps) {
+export function OnboardingFlow() {
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -48,7 +44,7 @@ export function OnboardingFlow({ userId }: OnboardingFlowProps) {
 
   function handleComplete() {
     startTransition(async () => {
-      await completeOnboarding(userId);
+      await completeOnboarding();
       router.push("/team/create");
     });
   }

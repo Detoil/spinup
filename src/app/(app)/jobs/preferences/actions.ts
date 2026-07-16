@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { applicantPreferencesSchema } from "@/lib/jobs/schemas";
 
 export async function savePreferences(formData: FormData) {
   const supabase = await createClient();
@@ -13,12 +14,30 @@ export async function savePreferences(formData: FormData) {
   if (!user) redirect("/sign-in");
 
   const profileId = formData.get("profile_id") as string;
-  const data = JSON.parse(formData.get("data") as string);
+  if (!profileId) return { error: "Missing profile" };
+
+  let data;
+  try {
+    data = applicantPreferencesSchema.parse(JSON.parse(formData.get("data") as string));
+  } catch {
+    return { error: "Invalid preferences data" };
+  }
 
   const admin = createAdminClient();
 
-  // Upsert preferences
-  await admin
+  // The admin client bypasses RLS, so we MUST verify the target profile belongs
+  // to the current user before writing — otherwise any user could overwrite
+  // another applicant's preferences by passing their profile id.
+  const { data: owned } = await admin
+    .from("jb_applicant_profiles")
+    .select("id")
+    .eq("id", profileId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!owned) return { error: "Not authorized" };
+
+  const { error } = await admin
     .from("jb_applicant_preferences")
     .upsert(
       {
@@ -31,6 +50,8 @@ export async function savePreferences(formData: FormData) {
       },
       { onConflict: "applicant_profile_id" }
     );
+
+  if (error) return { error: error.message };
 
   revalidatePath("/jobs/preferences");
   return { error: null };

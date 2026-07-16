@@ -3,14 +3,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
+import { getTeamAuth } from "@/lib/teams/authz";
+import { escapeHtml } from "@/lib/html";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-async function inviteMember(teamId: string, userId: string, teamName: string, formData: FormData) {
+async function inviteMember(teamId: string, _userId: string, teamName: string, formData: FormData) {
   "use server";
+  const auth = await getTeamAuth(teamId);
+  if (!auth) redirect("/sign-in");
+  if (!auth.isEntrepreneur) return;
+
   const email = (formData.get("email") as string).trim().toLowerCase();
   const role = (formData.get("role") as string) === "mentor" ? "mentor" : "entrepreneur";
   if (!email) return;
@@ -19,7 +25,7 @@ async function inviteMember(teamId: string, userId: string, teamName: string, fo
   await admin
     .from("team_invites")
     .upsert(
-      { team_id: teamId, email, role, invited_by: userId },
+      { team_id: teamId, email, role, invited_by: auth.user.id },
       { onConflict: "team_id,email" }
     );
 
@@ -33,14 +39,14 @@ async function inviteMember(teamId: string, userId: string, teamName: string, fo
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
         <h2 style="font-size:20px;margin-bottom:8px;">You're invited to SpinUp</h2>
         <p style="color:#555;margin-bottom:24px;">
-          You've been invited to join <strong>${teamName}</strong> as a <strong>${roleLabel}</strong>.
+          You've been invited to join <strong>${escapeHtml(teamName)}</strong> as a <strong>${roleLabel}</strong>.
         </p>
         <a href="${appUrl}/team/join"
            style="display:inline-block;background:#000;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
           Accept invite
         </a>
         <p style="color:#888;font-size:12px;margin-top:24px;">
-          Sign in (or create an account) with this email address to accept: <strong>${email}</strong>
+          Sign in (or create an account) with this email address to accept: <strong>${escapeHtml(email)}</strong>
         </p>
       </div>
     `,
@@ -51,15 +57,23 @@ async function inviteMember(teamId: string, userId: string, teamName: string, fo
 
 async function cancelInvite(teamId: string, inviteId: string) {
   "use server";
+  const auth = await getTeamAuth(teamId);
+  if (!auth) redirect("/sign-in");
+  if (!auth.isEntrepreneur) return;
+
   const admin = createAdminClient();
-  await admin.from("team_invites").delete().eq("id", inviteId);
+  await admin.from("team_invites").delete().eq("id", inviteId).eq("team_id", teamId);
   revalidatePath(`/teams/${teamId}/settings/members`);
 }
 
 async function removeMember(teamId: string, memberId: string) {
   "use server";
+  const auth = await getTeamAuth(teamId);
+  if (!auth) redirect("/sign-in");
+  if (!auth.isEntrepreneur) return;
+
   const admin = createAdminClient();
-  await admin.from("team_members").delete().eq("id", memberId);
+  await admin.from("team_members").delete().eq("id", memberId).eq("team_id", teamId);
   revalidatePath(`/teams/${teamId}/settings/members`);
 }
 

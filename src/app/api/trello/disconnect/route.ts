@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getTeamAuth } from "@/lib/teams/authz";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function GET(request: NextRequest) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// POST (not GET): disconnecting is a state change, so it must not be triggerable
+// via a cross-site <img>/link. Only a team entrepreneur (or admin) may do it.
+export async function POST(request: NextRequest) {
   const teamId = request.nextUrl.searchParams.get("teamId");
-  if (!teamId) {
-    return NextResponse.json({ error: "teamId required" }, { status: 400 });
+  if (!teamId || !UUID_RE.test(teamId)) {
+    return NextResponse.json({ error: "valid teamId required" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+  const auth = await getTeamAuth(teamId);
+  if (!auth) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!auth.isEntrepreneur) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Delete Trello connection
-  await supabase.from("trello_connections").delete().eq("team_id", teamId);
+  const admin = createAdminClient();
+  await admin.from("trello_connections").delete().eq("team_id", teamId);
 
-  return NextResponse.redirect(new URL(`/teams/${teamId}/settings/trello?disconnected=1`, request.url));
+  return NextResponse.json({ ok: true });
 }

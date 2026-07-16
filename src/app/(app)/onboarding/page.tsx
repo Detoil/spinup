@@ -10,7 +10,7 @@ export default async function OnboardingPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/sign-in");
   }
 
   const { data: profile } = await supabase
@@ -23,5 +23,5 @@ export default async function OnboardingPage() {
     redirect("/dashboard");
   }
 
-  return <OnboardingFlow userId={user.id} />;
+  return <OnboardingFlow />;
 }

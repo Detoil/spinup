@@ -15,6 +15,16 @@ export async function toggleFavourite(formData: FormData) {
   const applicantProfileId = formData.get("applicant_profile_id") as string;
   const action = formData.get("action") as string;
 
+  // Verify the user belongs to the company before touching its favourites.
+  const { data: membership } = await supabase
+    .from("jb_company_members")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership) return;
+
   if (action === "remove") {
     await supabase
       .from("jb_favourites")
