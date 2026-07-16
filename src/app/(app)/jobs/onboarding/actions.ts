@@ -50,16 +50,22 @@ export async function selectCompanyRole() {
     );
 
   // Create company
-  const { data: company } = await admin
+  const { data: company, error: companyError } = await admin
     .from("jb_companies")
     .insert({ name: "My Company" })
     .select("id")
     .single();
 
-  if (company) {
-    await admin
-      .from("jb_company_members")
-      .insert({ company_id: company.id, user_id: user.id, is_owner: true });
+  if (companyError || !company) {
+    throw new Error("Failed to create company: " + (companyError?.message ?? "unknown error"));
+  }
+
+  const { error: memberError } = await admin
+    .from("jb_company_members")
+    .insert({ company_id: company.id, user_id: user.id, is_owner: true });
+
+  if (memberError) {
+    throw new Error("Failed to add company member: " + memberError.message);
   }
 
   redirect("/jobs/company-profile");

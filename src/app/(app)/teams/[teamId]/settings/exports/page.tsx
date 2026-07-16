@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, FolderTree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -47,6 +47,28 @@ export default async function ExportsPage({ params }: { params: Promise<{ teamId
 
   return (
     <div className="space-y-6">
+      {/* Detoil / Notion handover export */}
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <FolderTree className="size-5 text-foreground shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold">Export for Detoil (Notion import)</h2>
+            <p className="text-xs text-muted-foreground">
+              Download all your deliverables laid out in the standard Detoil folder
+              structure (Finance, Legal, Governance, Operations…) as a Markdown bundle.
+              Import it into Notion via <strong>Import → Markdown &amp; CSV</strong> to get
+              running with Detoil, with your work already filed in the right place.
+            </p>
+          </div>
+        </div>
+        <Button asChild size="sm">
+          <a href={`/api/teams/${teamId}/detoil-export`}>
+            <Download className="size-3.5 mr-1" />
+            Download Detoil bundle (.zip)
+          </a>
+        </Button>
+      </div>
+
       {/* Export history */}
       {exports && exports.length > 0 ? (
         <div className="space-y-3">

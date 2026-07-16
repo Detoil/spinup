@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { companyProfileSchema } from "@/lib/jobs/schemas";
 
 export async function saveCompanyProfile(formData: FormData) {
   const supabase = await createClient();
@@ -12,7 +13,13 @@ export async function saveCompanyProfile(formData: FormData) {
   if (!user) redirect("/sign-in");
 
   const companyId = formData.get("company_id") as string;
-  const data = JSON.parse(formData.get("data") as string);
+
+  let data;
+  try {
+    data = companyProfileSchema.parse(JSON.parse(formData.get("data") as string));
+  } catch {
+    return { error: "Invalid company profile data" };
+  }
 
   // Verify membership
   const { data: membership } = await supabase

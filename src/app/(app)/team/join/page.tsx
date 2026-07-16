@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { acceptTeamInvite } from "@/lib/teams/accept-invite";
 import {
   Card,
   CardContent,
@@ -35,33 +36,16 @@ export default async function JoinTeamPage() {
     "use server";
 
     const inviteId = formData.get("invite_id") as string;
-    const teamId = formData.get("team_id") as string;
-    const role = (formData.get("role") as string) ?? "entrepreneur";
-
-    if (!inviteId || !teamId) return;
+    if (!inviteId) return;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) redirect("/sign-in");
 
-    const admin = createAdminClient();
+    const result = await acceptTeamInvite(inviteId, { id: user.id, email: user.email });
+    if ("error" in result) redirect("/team/join");
 
-    // Mark invite as accepted
-    const { error: inviteError } = await admin
-      .from("team_invites")
-      .update({ accepted: true })
-      .eq("id", inviteId);
-
-    if (inviteError) return;
-
-    // Create team_member record
-    await admin.from("team_members").insert({
-      team_id: teamId,
-      user_id: user.id,
-      role: role as "entrepreneur" | "mentor",
-    });
-
-    redirect(`/teams/${teamId}/tools/company-name`);
+    redirect(`/teams/${result.teamId}/tools/company-name`);
   }
 
   const hasInvites = invites && invites.length > 0;

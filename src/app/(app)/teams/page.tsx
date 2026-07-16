@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { acceptTeamInvite } from "@/lib/teams/accept-invite";
 import {
   Card,
   CardContent,
@@ -55,10 +56,7 @@ export default async function TeamsPage() {
     "use server";
 
     const inviteId = formData.get("invite_id") as string;
-    const teamId = formData.get("team_id") as string;
-    const role = (formData.get("role") as string) ?? "entrepreneur";
-
-    if (!inviteId || !teamId) return;
+    if (!inviteId) return;
 
     const supabase = await createClient();
     const {
@@ -66,21 +64,10 @@ export default async function TeamsPage() {
     } = await supabase.auth.getUser();
     if (!user) redirect("/sign-in");
 
-    const admin = createAdminClient();
+    const result = await acceptTeamInvite(inviteId, { id: user.id, email: user.email });
+    if ("error" in result) redirect("/teams");
 
-    const { error: inviteError } = await admin
-      .from("team_invites")
-      .update({ accepted: true })
-      .eq("id", inviteId);
-
-    if (inviteError) return;
-
-    await admin.from("team_members").upsert(
-      { team_id: teamId, user_id: user.id, role: role as "entrepreneur" | "mentor" },
-      { onConflict: "team_id,user_id", ignoreDuplicates: true }
-    );
-
-    redirect(`/teams/${teamId}`);
+    redirect(`/teams/${result.teamId}`);
   }
 
   return (

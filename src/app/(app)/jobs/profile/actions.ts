@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { applicantProfileSchema } from "@/lib/jobs/schemas";
 
 export async function saveApplicantProfile(formData: FormData) {
   const supabase = await createClient();
@@ -12,7 +13,13 @@ export async function saveApplicantProfile(formData: FormData) {
   if (!user) redirect("/sign-in");
 
   const profileId = formData.get("profile_id") as string;
-  const data = JSON.parse(formData.get("data") as string);
+
+  let data;
+  try {
+    data = applicantProfileSchema.parse(JSON.parse(formData.get("data") as string));
+  } catch {
+    return { error: "Invalid profile data" };
+  }
 
   const { error } = await supabase
     .from("jb_applicant_profiles")
@@ -48,11 +55,13 @@ export async function togglePublish(formData: FormData) {
   const profileId = formData.get("profile_id") as string;
   const published = formData.get("is_published") === "true";
 
-  await supabase
+  const { error } = await supabase
     .from("jb_applicant_profiles")
     .update({ is_published: published })
     .eq("id", profileId)
     .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
 
   revalidatePath("/jobs/profile");
 }

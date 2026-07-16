@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
+import { escapeHtml, safeHttpUrl } from "@/lib/html";
+import { outreachMessageSchema } from "@/lib/jobs/schemas";
 
 export async function sendOutreach(formData: FormData) {
   const supabase = await createClient();
@@ -14,8 +16,14 @@ export async function sendOutreach(formData: FormData) {
   if (!user) redirect("/sign-in");
 
   const companyId = formData.get("company_id") as string;
-  const applicantProfileId = formData.get("applicant_profile_id") as string;
-  const message = (formData.get("message") as string) || null;
+
+  const parsed = outreachMessageSchema.safeParse({
+    applicant_profile_id: formData.get("applicant_profile_id"),
+    message: (formData.get("message") as string) || null,
+  });
+  if (!parsed.success) return { error: "Invalid outreach details" };
+  const applicantProfileId = parsed.data.applicant_profile_id;
+  const message = parsed.data.message;
 
   // Verify company membership
   const { data: membership } = await supabase
@@ -67,14 +75,25 @@ export async function sendOutreach(formData: FormData) {
     message,
   });
 
-  // Build and send email
+  // Build and send email. Every interpolated value is HTML-escaped and every
+  // URL is scheme-checked to prevent HTML/script injection into the recipient's
+  // inbox via attacker-controlled company profile fields.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkedinList = (company.team_linkedin as any[] ?? [])
-    .map(
-      (l: { name: string; role: string; linkedin_url: string }) =>
-        `<li><a href="${l.linkedin_url}" style="color: #3b82f6;">${l.name}</a> — ${l.role}</li>`
-    )
+    .map((l: { name: string; role: string; linkedin_url: string }) => {
+      const href = safeHttpUrl(l.linkedin_url);
+      const label = escapeHtml(l.name);
+      const linkHtml = href ? `<a href="${escapeHtml(href)}" style="color: #3b82f6;">${label}</a>` : label;
+      return `<li>${linkHtml} — ${escapeHtml(l.role)}</li>`;
+    })
     .join("");
+
+  const companyName = escapeHtml(company.name);
+  const whatWeDo = company.what_we_do ? escapeHtml(company.what_we_do) : "";
+  const howWeWork = company.how_we_work ? escapeHtml(company.how_we_work) : "";
+  const websiteUrl = safeHttpUrl(company.website_url);
+  const messageHtml = message ? escapeHtml(message) : "";
+  const senderEmailSafe = escapeHtml(senderEmail);
 
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 580px; color: #111827;">
@@ -82,21 +101,21 @@ export async function sendOutreach(formData: FormData) {
       <p>A company found your profile on <strong>SpinUp Jobs</strong> and would like to connect with you.</p>
 
       <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0; background: #f9fafb;">
-        <h3 style="margin: 0 0 12px 0; font-size: 18px;">${company.name}</h3>
+        <h3 style="margin: 0 0 12px 0; font-size: 18px;">${companyName}</h3>
 
-        ${company.what_we_do ? `
+        ${whatWeDo ? `
           <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">What we do</p>
-          <p style="margin: 0 0 16px 0; font-size: 14px; color: #374151;">${company.what_we_do}</p>
+          <p style="margin: 0 0 16px 0; font-size: 14px; color: #374151;">${whatWeDo}</p>
         ` : ""}
 
-        ${company.how_we_work ? `
+        ${howWeWork ? `
           <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">How we work</p>
-          <p style="margin: 0 0 16px 0; font-size: 14px; color: #374151;">${company.how_we_work}</p>
+          <p style="margin: 0 0 16px 0; font-size: 14px; color: #374151;">${howWeWork}</p>
         ` : ""}
 
-        ${company.website_url ? `
+        ${websiteUrl ? `
           <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Website</p>
-          <p style="margin: 0 0 16px 0;"><a href="${company.website_url}" style="color: #3b82f6; font-size: 14px;">${company.website_url}</a></p>
+          <p style="margin: 0 0 16px 0;"><a href="${escapeHtml(websiteUrl)}" style="color: #3b82f6; font-size: 14px;">${escapeHtml(websiteUrl)}</a></p>
         ` : ""}
 
         ${linkedinList ? `
@@ -105,17 +124,17 @@ export async function sendOutreach(formData: FormData) {
         ` : ""}
       </div>
 
-      ${message ? `
+      ${messageHtml ? `
         <div style="border-left: 3px solid #3b82f6; padding: 12px 16px; margin: 20px 0; background: #eff6ff; border-radius: 0 6px 6px 0;">
-          <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Message from ${company.name}</p>
-          <p style="margin: 0; font-size: 14px; color: #374151;">${message}</p>
+          <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Message from ${companyName}</p>
+          <p style="margin: 0; font-size: 14px; color: #374151;">${messageHtml}</p>
         </div>
       ` : ""}
 
       <div style="margin: 24px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;">
         <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #374151;">Reply directly to:</p>
         <p style="margin: 0; font-size: 14px;">
-          <a href="mailto:${senderEmail}" style="color: #3b82f6;">${senderEmail}</a>
+          <a href="mailto:${senderEmailSafe}" style="color: #3b82f6;">${senderEmailSafe}</a>
         </p>
         <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">
           We suggest you always respond — even if you&apos;re not interested. A short, polite reply keeps the community healthy and may open unexpected doors.
@@ -123,7 +142,7 @@ export async function sendOutreach(formData: FormData) {
       </div>
 
       <p style="margin-top: 20px;">
-        <a href="mailto:${senderEmail}?subject=Re: SpinUp Jobs — ${encodeURIComponent(company.name)}"
+        <a href="mailto:${encodeURIComponent(senderEmail)}?subject=${encodeURIComponent(`Re: SpinUp Jobs — ${company.name}`)}"
            style="display: inline-block; background: #111827; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
           Respond
         </a>

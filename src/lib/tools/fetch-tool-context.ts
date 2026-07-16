@@ -39,6 +39,12 @@ export async function fetchToolContext(
   const supabase = await createClient();
   const admin = createAdminClient();
 
+  // teamId is interpolated into a PostgREST .or() filter below — reject anything
+  // that isn't a plain UUID to avoid filter injection.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(teamId)) {
+    redirect("/dashboard");
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
