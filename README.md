@@ -1,4 +1,49 @@
-# SpinUp
+# SpinUp (superseded)
+
+**SpinUp is no longer developed. Its tools now live in [Yams](https://github.com/Detoil/Yams) as
+"Help me grow"**, rebuilt on Firebase (Authentication, Firestore, Cloud Storage and Hosting) in
+place of Supabase, with every calculation tested and every South African figure dated and
+sourced. The plan and the tool-by-tool decisions are in
+[`docs/grow-plan.md`](https://github.com/Detoil/Yams/blob/claude/sa-funding-platform-uwdyq6/docs/grow-plan.md)
+in Yams.
+
+## What moved to Yams
+
+Every tool in the four phases and the three that ran throughout, several merged:
+
+- Scale unit economics is part of the customer acquisition review.
+- The scale financial model is the scenarios in the financial model, which now handles VAT and
+  company tax.
+- The retention tracker is the cohort table in the product-market fit dashboard.
+- The founder-CEO tracker is the last pillar of scaling readiness.
+- The hiring planner now counts UIF, SDL, COIDA and leave, and flags the Employment Tax Incentive.
+- The company name checker is the "Before you reserve a name" step in the Yams CIPC guide.
+- The Detoil handover export is "Download for Detoil (Notion import)" on the Help me grow page.
+
+## What was deliberately dropped
+
+- The job board: applicant and company profiles, favourites and outreach.
+- Trello board sync.
+- Team accounts and invites. Yams is one founder's workspace; mentor access will come back as
+  sharing links.
+- Mentor and admin notes on tools, and mentor applications.
+- The admin console.
+- The SA compliance checklist, the funding tracker and process docs, which Yams already covers
+  with its data room, calendar, funding tracker and templates.
+
+## Shutting it down
+
+1. Ask each team owner to open **Team settings, Exports, Export for Detoil (Notion import)** and download their bundle, or run the export
+   for them. There is no automatic migration into Yams: the data shapes differ and team accounts
+   are not coming across.
+2. Set `SUPERSEDED_BY_URL` to the Yams address and redeploy. Every route then redirects there.
+3. Pause the Supabase project once the exports are confirmed.
+4. Archive this repository.
+
+---
+
+The rest of this file describes SpinUp as it was, for anyone running it locally to export data.
+
 
 SpinUp is a startup accelerator platform for South African founders. Teams work
 through a structured, phase-based journey — from validating an idea to scaling a
